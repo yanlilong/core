@@ -164,7 +164,7 @@ class SwAutoFormat
 
     void BuildIndent();
     void BuildText();
-    void BuildTextIndent();
+    sal_uInt16 BuildTextIndent();
     void BuildEnum( sal_uInt16 nLvl, sal_uInt16 nDigitLevel );
     void BuildNegIndent( SwTwips nSpaces );
     void BuildHeadLine( sal_uInt16 nLvl );
@@ -428,13 +428,6 @@ sal_uInt16 SwAutoFormat::CalcLevel( const SwTextNode& rNd, sal_uInt16 *pDigitLvl
 
     if( RES_POOLCOLL_TEXT_MOVE == rNd.GetTextColl()->GetPoolFormatId() )
     {
-        if( m_aFlags.bAFormatByInput )
-        {
-            nLvl = rNd.GetAutoFormatLvl();
-            const_cast<SwTextNode&>(rNd).SetAutoFormatLvl( 0 );
-            if( nLvl )
-                return nLvl;
-        }
         ++nLvl;
     }
 
@@ -1277,7 +1270,7 @@ void SwAutoFormat::BuildIndent()
     AutoCorrect();
 }
 
-void SwAutoFormat::BuildTextIndent()
+sal_uInt16 SwAutoFormat::BuildTextIndent()
 {
     SetRedlineText( STR_AUTOFMTREDL_SET_TMPL_TEXT_INDENT);
     // read all succeeding paragraphs that belong to this indentation
@@ -1289,8 +1282,11 @@ void SwAutoFormat::BuildTextIndent()
                     IsBlanksInString( *m_pCurTextNd ) ||
                     IsSentenceAtEnd( *m_pCurTextNd );
 
+    sal_uInt16 nRet(0);
     if( m_aFlags.bAFormatByInput )
-        m_pCurTextNd->SetAutoFormatLvl( static_cast<sal_uInt8>(CalcLevel( *m_pCurTextNd )) );
+    {
+        nRet = CalcLevel( *m_pCurTextNd );
+    }
 
     SetColl( RES_POOLCOLL_TEXT_MOVE );
     if( !bBreak )
@@ -1313,6 +1309,7 @@ void SwAutoFormat::BuildTextIndent()
     }
     DeleteLeadingTrailingBlanks();
     AutoCorrect();
+    return nRet;
 }
 
 void SwAutoFormat::BuildText()
@@ -2251,6 +2248,8 @@ SwAutoFormat::SwAutoFormat( SwEditShell* pEdShell, SvxSwAutoFormatFlags const & 
                     break;
                 }
 
+                sal_uInt16 nBuildTextIndentLevel(0);
+
                 // check for hard spaces or LRSpaces set by the template
                 if( IsPoolUserFormat( nPoolId ) ||
                     RES_POOLCOLL_STANDARD == nPoolId )
@@ -2285,14 +2284,22 @@ SwAutoFormat::SwAutoFormat( SwEditShell* pEdShell, SvxSwAutoFormatFlags const & 
                             else if( 0 > nSz )      // negative 1st line indentation
                                 BuildNegIndent( aFInfo.GetLineStart() );
                             else if( pLRSpace->GetTextLeft() )   // is indentation
-                                BuildTextIndent();
+                                nBuildTextIndentLevel = BuildTextIndent();
                         }
                         eStat = READ_NEXT_PARA;
                         break;
                     }
                 }
 
-                nLevel = CalcLevel( *m_pCurTextNd, &nDigitLvl );
+                if (nBuildTextIndentLevel != 0)
+                {
+                    nLevel = nBuildTextIndentLevel;
+                    nDigitLvl = USHRT_MAX;
+                }
+                else
+                {
+                    nLevel = CalcLevel( *m_pCurTextNd, &nDigitLvl );
+                }
                 m_bMoreLines = !IsOneLine( *m_pCurTextNd );
                 pNxtNd = GetNextNode();
                 if( pNxtNd )
