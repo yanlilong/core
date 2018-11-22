@@ -172,15 +172,15 @@ class SwAutoFormat
     static bool HasSelBlanks( SwPaM& rPam );
     static bool HasBreakAttr( const SwTextNode& );
     void DeleteSel( SwPaM& rPam );
-    bool DeleteCurNxtPara( const OUString& rNxtPara );
+    bool DeleteJoinCurNextPara( const OUString& rNxtPara );
     /// delete in the node start and/or end
-    void DeleteCurrentParagraph( bool bStart = true, bool bEnd = true );
+    void DeleteLeadingTrailingBlanks( bool bStart = true, bool bEnd = true );
     void DelEmptyLine( bool bTstNextPara = true );
     /// when using multiline paragraphs delete the "left" and/or
     /// "right" margins
     void DelMoreLinesBlanks( bool bWithLineBreaks = false );
-    /// delete the previous paragraph
-    void DelPrevPara();
+    /// join with the previous paragraph
+    void JoinPrevPara();
     /// execute AutoCorrect on current TextNode
     void AutoCorrect( sal_Int32 nSttPos = 0 );
 
@@ -333,7 +333,7 @@ OUString SwAutoFormat::GoNextPara()
 bool SwAutoFormat::HasObjects( const SwNode& rNd )
 {
     // Is there something bound to the paragraph in the paragraph
-    // like borders, DrawObjects, ...
+    // like Frames, DrawObjects, ...
     bool bRet = false;
     const SwFrameFormats& rFormats = *m_pDoc->GetSpzFrameFormats();
     for( auto pFrameFormat : rFormats )
@@ -1055,7 +1055,7 @@ bool SwAutoFormat::IsSentenceAtEnd( const SwTextNode& rTextNd )
 }
 
 /// Delete beginning and/or end in a node
-void SwAutoFormat::DeleteCurrentParagraph( bool bStart, bool bEnd )
+void SwAutoFormat::DeleteLeadingTrailingBlanks(bool bStart, bool bEnd)
 {
     if( m_aFlags.bAFormatByInput
         ? m_aFlags.bAFormatByInpDelSpacesAtSttEnd
@@ -1115,7 +1115,7 @@ void SwAutoFormat::DeleteSel( SwPaM& rDelPam )
         m_pEditShell->DeleteSel( rDelPam );
 }
 
-bool SwAutoFormat::DeleteCurNxtPara( const OUString& rNxtPara )
+bool SwAutoFormat::DeleteJoinCurNextPara( const OUString& rNxtPara )
 {
     // delete blanks at the end of the current and at the beginning of the next one
     m_aDelPam.DeleteMark();
@@ -1221,8 +1221,7 @@ void SwAutoFormat::DelMoreLinesBlanks( bool bWithLineBreaks )
     }
 }
 
-// delete the previous paragraph
-void SwAutoFormat::DelPrevPara()
+void SwAutoFormat::JoinPrevPara()
 {
     m_aDelPam.DeleteMark();
     m_aDelPam.GetPoint()->nNode = m_aNdIdx;
@@ -1263,7 +1262,7 @@ void SwAutoFormat::BuildIndent()
                 bBreak = !IsFastFullLine( *pNxtNd ) ||
                         IsBlanksInString( *pNxtNd ) ||
                         IsSentenceAtEnd( *pNxtNd );
-                if( DeleteCurNxtPara( pNxtNd->GetText() ))
+                if (DeleteJoinCurNextPara(pNxtNd->GetText()))
                 {
                     m_pDoc->getIDocumentContentOperations().InsertString( m_aDelPam, OUString(' ') );
                 }
@@ -1274,7 +1273,7 @@ void SwAutoFormat::BuildIndent()
                     !CalcLevel( *pNxtNd ) );
         }
     }
-    DeleteCurrentParagraph();
+    DeleteLeadingTrailingBlanks();
     AutoCorrect();
 }
 
@@ -1303,7 +1302,7 @@ void SwAutoFormat::BuildTextIndent()
         {
             bBreak = !IsFastFullLine( *pNxtNd ) || IsBlanksInString( *pNxtNd ) ||
                     IsSentenceAtEnd( *pNxtNd );
-            if( DeleteCurNxtPara( pNxtNd->GetText() ) )
+            if (DeleteJoinCurNextPara(pNxtNd->GetText()))
             {
                 m_pDoc->getIDocumentContentOperations().InsertString( m_aDelPam, OUString(' ') );
             }
@@ -1312,7 +1311,7 @@ void SwAutoFormat::BuildTextIndent()
             pNxtNd = GetNextNode();
         }
     }
-    DeleteCurrentParagraph();
+    DeleteLeadingTrailingBlanks();
     AutoCorrect();
 }
 
@@ -1337,7 +1336,7 @@ void SwAutoFormat::BuildText()
         {
             bBreak = !IsFastFullLine( *pNxtNd ) || IsBlanksInString( *pNxtNd ) ||
                     IsSentenceAtEnd( *pNxtNd );
-            if( DeleteCurNxtPara( pNxtNd->GetText() ) )
+            if (DeleteJoinCurNextPara(pNxtNd->GetText()))
             {
                 m_pDoc->getIDocumentContentOperations().InsertString( m_aDelPam, OUString(' ') );
             }
@@ -1349,7 +1348,7 @@ void SwAutoFormat::BuildText()
                 break;
         }
     }
-    DeleteCurrentParagraph();
+    DeleteLeadingTrailingBlanks();
     AutoCorrect();
 }
 
@@ -1382,7 +1381,7 @@ void SwAutoFormat::BuildEnum( sal_uInt16 nLvl, sal_uInt16 nDigitLevel )
                     IsBlanksInString( *m_pCurTextNd ) ||
                     IsSentenceAtEnd( *m_pCurTextNd );
     bool bRTL = m_pEditShell->IsInRightToLeftText();
-    DeleteCurrentParagraph();
+    DeleteLeadingTrailingBlanks();
 
     bool bChgBullet = false, bChgEnum = false;
     sal_Int32 nAutoCorrPos = 0;
@@ -1649,7 +1648,7 @@ void SwAutoFormat::BuildEnum( sal_uInt16 nLvl, sal_uInt16 nDigitLevel )
         SetRedlineText( STR_AUTOFMTREDL_DEL_MORELINES );
         bBreak = !IsFastFullLine( *pNxtNd ) || IsBlanksInString( *pNxtNd ) ||
                 IsSentenceAtEnd( *pNxtNd );
-        if( DeleteCurNxtPara( pNxtNd->GetText() ) )
+        if (DeleteJoinCurNextPara(pNxtNd->GetText()))
         {
             m_pDoc->getIDocumentContentOperations().InsertString( m_aDelPam, OUString(' ') );
         }
@@ -1660,7 +1659,7 @@ void SwAutoFormat::BuildEnum( sal_uInt16 nLvl, sal_uInt16 nDigitLevel )
         if(!pNxtNd || pCurrNode == pNxtNd)
             break;
     }
-    DeleteCurrentParagraph( false );
+    DeleteLeadingTrailingBlanks( false );
     AutoCorrect( nAutoCorrPos );
 }
 
@@ -1736,7 +1735,7 @@ void SwAutoFormat::BuildNegIndent( SwTwips nSpaces )
             bBreak = !IsFastFullLine( *pNxtNd ) ||
                     IsBlanksInString( *pNxtNd ) ||
                     IsSentenceAtEnd( *pNxtNd );
-            if( DeleteCurNxtPara( pNxtNd->GetText() ) )
+            if (DeleteJoinCurNextPara(pNxtNd->GetText()))
             {
                 m_pDoc->getIDocumentContentOperations().InsertString( m_aDelPam, OUString(' ') );
             }
@@ -1745,7 +1744,7 @@ void SwAutoFormat::BuildNegIndent( SwTwips nSpaces )
             pNxtNd = GetNextNode();
         }
     }
-    DeleteCurrentParagraph();
+    DeleteLeadingTrailingBlanks();
     AutoCorrect();
 }
 
@@ -1764,10 +1763,10 @@ void SwAutoFormat::BuildHeadLine( sal_uInt16 nLvl )
     {
         SwTextFormatColl& rNxtColl = m_pCurTextNd->GetTextColl()->GetNextTextFormatColl();
 
-        DelPrevPara();
+        JoinPrevPara();
 
-        DeleteCurrentParagraph( true, false );
-        (void)DeleteCurNxtPara( OUString() );
+        DeleteLeadingTrailingBlanks( true, false );
+        (void)DeleteJoinCurNextPara( OUString() );
 
         m_aDelPam.DeleteMark();
         m_aDelPam.GetPoint()->nNode = m_aNdIdx.GetIndex() + 1;
@@ -1776,7 +1775,7 @@ void SwAutoFormat::BuildHeadLine( sal_uInt16 nLvl )
     }
     else
     {
-        DeleteCurrentParagraph();
+        DeleteLeadingTrailingBlanks();
         AutoCorrect();
     }
 }
@@ -2152,16 +2151,16 @@ SwAutoFormat::SwAutoFormat( SwEditShell* pEdShell, SvxSwAutoFormatFlags const & 
 
     enum Format_Status
     {
-        READ_NEXT_PARA,
-        TST_EMPTY_LINE,
-        TST_ALPHA_LINE,
-        GET_ALL_INFO,
-        IS_ONE_LINE,
-        TST_ENUMERIC,
-        TST_IDENT,
-        TST_NEG_IDENT,
-        TST_TXT_BODY,
-        HAS_FMTCOLL,
+        READ_NEXT_PARA, // -> ISEND, TST_EMPTY_LINE
+        TST_EMPTY_LINE, // -> READ_NEXT_PARA, TST_ALPHA_LINE
+        TST_ALPHA_LINE, // -> READ_NEXT_PARA, GET_ALL_INFO, IS_END
+        GET_ALL_INFO,   // -> READ_NEXT_PARA, IS_ONE_LINE, TST_ENUMERIC, HAS_FMTCOLL
+        IS_ONE_LINE,    // -> READ_NEXT_PARA, TST_ENUMERIC
+        TST_ENUMERIC,   // -> READ_NEXT_PARA, TST_IDENT, TST_NEG_IDENT
+        TST_IDENT,      // -> READ_NEXT_PARA, TST_TXT_BODY
+        TST_NEG_IDENT,  // -> READ_NEXT_PARA, TST_TXT_BODY
+        TST_TXT_BODY,   // -> READ_NEXT_PARA
+        HAS_FMTCOLL,    // -> READ_NEXT_PARA
         IS_END
     } eStat;
 
